@@ -16,6 +16,14 @@ def cmd_serve(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
+
+    if args.context:
+        from tokenledger.context.tracker import set_manual_context
+        from tokenledger.storage.db import init_db
+        db_path = init_db()
+        set_manual_context(args.context, db_path)
+        print(f"Context set: '{args.context}'", file=sys.stderr)
+
     try:
         run_server(host=args.host, port=args.port)
     except OSError as exc:
@@ -123,6 +131,8 @@ def main() -> None:
     serve = sub.add_parser("serve", help="Start the proxy server")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8080)
+    serve.add_argument("--context", default=None, metavar="LABEL",
+                       help="Set work context before starting (overrides git branch auto-detection)")
 
     # context
     ctx = sub.add_parser("context", help="Get or set the current work context")
