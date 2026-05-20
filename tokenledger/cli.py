@@ -191,6 +191,63 @@ def cmd_report(args: argparse.Namespace) -> None:
         console.print(detail)
 
 
+def cmd_export(args: argparse.Namespace) -> None:
+    import csv
+    import json as _json
+    from tokenledger.storage.db import get_conn, init_db
+
+    db_path = init_db()
+    fmt = args.format.lower()
+    out = open(args.output, "w", newline="" if fmt == "csv" else None, encoding="utf-8") \
+        if args.output else sys.stdout
+
+    try:
+        with get_conn(db_path) as conn:
+            query = """
+                SELECT
+                    ca.id          AS call_id,
+                    c.id           AS context_id,
+                    c.name         AS context,
+                    c.repo         AS repo,
+                    c.source       AS source,
+                    ca.timestamp,
+                    ca.model,
+                    ca.input_tokens,
+                    ca.output_tokens,
+                    ca.input_cost,
+                    ca.output_cost,
+                    ca.total_cost,
+                    ca.request_id
+                FROM calls ca
+                LEFT JOIN contexts c ON c.id = ca.context_id
+            """
+            params: list = []
+            if args.context_id is not None:
+                query += " WHERE ca.context_id = ?"
+                params.append(args.context_id)
+            if args.repo:
+                query += " AND c.repo = ?" if params else " WHERE c.repo = ?"
+                params.append(args.repo)
+            query += " ORDER BY ca.timestamp"
+            rows = conn.execute(query, params).fetchall()
+
+        if fmt == "csv":
+            if not rows:
+                return
+            writer = csv.DictWriter(out, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(dict(r) for r in rows)
+        else:
+            _json.dump([dict(r) for r in rows], out, indent=2, default=str)
+            out.write("\n")
+
+        if args.output:
+            print(f"Exported {len(rows)} calls to {args.output}", file=sys.stderr)
+    finally:
+        if args.output:
+            out.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="tokenledger",
@@ -215,6 +272,17 @@ def main() -> None:
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8787)
 
+    # export
+    export = sub.add_parser("export", help="Export call data to CSV or JSON")
+    export.add_argument("--format", choices=["csv", "json"], default="csv",
+                        help="Output format (default: csv)")
+    export.add_argument("--output", "-o", default=None, metavar="FILE",
+                        help="Write to file instead of stdout")
+    export.add_argument("--context-id", type=int, default=None, metavar="ID",
+                        help="Export a specific context only")
+    export.add_argument("--repo", default=None, metavar="REPO",
+                        help="Filter by repo name")
+
     # report
     report = sub.add_parser("report", help="Show cost breakdown by context")
     report.add_argument(
@@ -232,6 +300,8 @@ def main() -> None:
         cmd_context(args)
     elif args.command == "ui":
         cmd_ui(args)
+    elif args.command == "export":
+        cmd_export(args)
     elif args.command == "report":
         cmd_report(args)
     else:
