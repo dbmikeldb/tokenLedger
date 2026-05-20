@@ -1,76 +1,170 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>tokenledger — context</title>
+  <title>tokenledger</title>
+  <script>
+    (function() {
+      const t = localStorage.getItem('tl-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg: #0f172a; --surface: #1e293b; --border: #334155;
-      --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6;
-      --green: #22c55e; --amber: #f59e0b;
+
+    :root[data-theme="dark"] {
+      --bg:           #0e131a;
+      --bg-raised:    #131b24;
+      --surface:      #19232f;
+      --surface-2:    #1f2d3d;
+      --border:       #253347;
+      --border-subtle:#1b2a3a;
+      --text:         #dce8f5;
+      --text-muted:   #6e8ca8;
+      --text-subtle:  #3d576e;
+      --accent:       #4a90d9;
+      --accent-dim:   rgba(74,144,217,0.12);
+      --accent-dimmer:rgba(74,144,217,0.06);
+      --green:        #38c78a;
+      --green-dim:    rgba(56,199,138,0.10);
+      --amber:        #e8a84c;
+      --shadow-sm:    0 1px 2px rgba(0,0,0,0.3);
     }
-    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
-    header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+    :root[data-theme="light"] {
+      --bg:           #eaf0f8;
+      --bg-raised:    #f0f5fb;
+      --surface:      #ffffff;
+      --surface-2:    #f5f8fc;
+      --border:       #d0dae8;
+      --border-subtle:#e3eaf4;
+      --text:         #1a2638;
+      --text-muted:   #55718f;
+      --text-subtle:  #9ab0c8;
+      --accent:       #2370be;
+      --accent-dim:   rgba(35,112,190,0.08);
+      --accent-dimmer:rgba(35,112,190,0.04);
+      --green:        #0d9e68;
+      --green-dim:    rgba(13,158,104,0.08);
+      --amber:        #c47d0a;
+      --shadow-sm:    0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    header {
+      height: 52px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-raised);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .wordmark { font-size: 15px; font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
+    .wordmark span { color: var(--accent); }
     header .spacer { flex: 1; }
-    .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
-    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .last-updated { color: var(--muted); font-size: 11px; }
+    .header-meta { display: flex; align-items: center; gap: 12px; }
+    .live-pill {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: var(--text-muted);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 10px;
+    }
+    .live-dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; display:inline-block; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .theme-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-muted);
+      cursor: pointer; font-size: 14px; padding: 4px 8px; line-height: 1;
+      transition: color .15s, background .15s;
+    }
+    .theme-btn:hover { color: var(--text); background: var(--surface-2); }
+
+    main { padding: 24px; max-width: 1240px; margin: 0 auto; }
+
+    .breadcrumb { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+    .breadcrumb a { color: var(--text-muted); }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb sep { margin: 0 6px; opacity: .4; }
+
+    .ctx-header { margin-bottom: 20px; }
+    .ctx-name { font-size: 22px; font-weight: 700; letter-spacing: -0.025em; margin-bottom: 6px; }
+    .ctx-meta { display: flex; gap: 14px; align-items: center; color: var(--text-muted); font-size: 12px; flex-wrap: wrap; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow-sm); }
+    .card-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 10px; }
+    .card-value { font-size: 24px; font-weight: 700; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+
+    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
+    .chart-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 16px; }
+    .chart-box canvas { max-height: 200px; }
+
+    .table-header { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); margin-bottom: 10px; }
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow-sm); }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; padding: 9px 16px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
+    td { padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--accent-dimmer); }
+
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
-    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
-    .breadcrumb { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
-    .breadcrumb a { color: var(--muted); }
-    .context-header { margin-bottom: 24px; }
-    .context-name { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
-    .context-meta { color: var(--muted); font-size: 12px; display: flex; gap: 16px; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-    .card-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-    .card-value { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
-    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-    .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
-    .chart-box canvas { max-height: 200px; }
-    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    th { text-align: left; padding: 10px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; }
-    td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .mono { font-family: ui-monospace, monospace; font-size: 12px; }
-    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, monospace; }
-    .muted { color: var(--muted); }
-    .model-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; background: rgba(59,130,246,0.12); color: var(--accent); }
-    .source-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-    .source-git    { background: rgba(59,130,246,0.15); color: var(--accent); }
-    .source-manual { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .mono { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; }
+    .text-muted { color: var(--text-muted); }
+
+    .badge-source { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.04em; }
+    .badge-git    { background: var(--accent-dim); color: var(--accent); }
+    .badge-manual { background: rgba(232,168,76,0.12); color: var(--amber); }
+    .model-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: var(--accent-dim); color: var(--accent); }
   </style>
 </head>
 <body>
   <header>
-    <div class="badge">TL</div>
-    <h1>tokenledger</h1>
+    <div class="wordmark">token<span>ledger</span></div>
     <div class="spacer"></div>
-    <span class="live-dot"></span>
-    <span class="last-updated" id="last-updated">loading…</span>
+    <div class="header-meta">
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        <span id="last-updated">loading</span>
+      </div>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
+    </div>
   </header>
-  <main>
-    <div class="breadcrumb"><a href="/">Dashboard</a> / <span id="ctx-name-crumb">context</span></div>
 
-    <div class="context-header">
-      <div class="context-name" id="ctx-name">—</div>
-      <div class="context-meta">
+  <main>
+    <div class="breadcrumb">
+      <a href="/">Dashboard</a>
+      <sep>/</sep>
+      <span id="ctx-name-crumb">context</span>
+    </div>
+
+    <div class="ctx-header">
+      <div class="ctx-name" id="ctx-name">—</div>
+      <div class="ctx-meta">
         <span id="ctx-source"></span>
         <span id="ctx-started"></span>
         <span id="ctx-ended"></span>
       </div>
     </div>
 
-    <!-- Stat cards -->
     <div class="cards">
       <div class="card">
         <div class="card-label">Total cost</div>
@@ -90,32 +184,50 @@
       </div>
     </div>
 
-    <!-- Cost over time for this context -->
     <div class="chart-box">
-      <div class="chart-title">Spend over time — this context</div>
+      <div class="chart-label">Cumulative spend</div>
       <canvas id="chart-timeline"></canvas>
     </div>
 
-    <!-- Call log -->
-    <div class="section-title">Call log</div>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Time</th>
-          <th>Model</th>
-          <th style="text-align:right">Input tokens</th>
-          <th style="text-align:right">Output tokens</th>
-          <th style="text-align:right">Cost</th>
-        </tr>
-      </thead>
-      <tbody id="calls-tbody">
-        <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div class="table-header">Call log</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Time</th>
+            <th>Model</th>
+            <th style="text-align:right">Input</th>
+            <th style="text-align:right">Output</th>
+            <th style="text-align:right">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="calls-tbody">
+          <tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:32px">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 
 <script>
+function toggleTheme() {
+  const cur  = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('tl-theme', next);
+  document.getElementById('theme-btn').textContent = next === 'dark' ? '☀' : '☾';
+  if (tlChart) {
+    const c = chartColors();
+    ['x','y'].forEach(ax => {
+      tlChart.options.scales[ax].ticks.color = c.tick;
+      tlChart.options.scales[ax].grid.color  = c.grid;
+    });
+    tlChart.update();
+  }
+}
+document.getElementById('theme-btn').textContent =
+  (document.documentElement.getAttribute('data-theme') === 'dark') ? '☀' : '☾';
+
 const contextId = parseInt(location.pathname.split('/').pop());
 const fmt = {
   cost:  v => `$${(v||0).toFixed(4)}`,
@@ -124,20 +236,24 @@ const fmt = {
 };
 const shortModel = m => m.includes('opus')?'opus':m.includes('sonnet')?'sonnet':m.includes('haiku')?'haiku':m;
 
-let timelineChart = null;
+function chartColors() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  return { grid: dark ? '#1d2e3e' : '#e0e9f3', tick: dark ? '#4a6880' : '#7a9ab8' };
+}
+
+let tlChart = null;
 let headerLoaded = false;
 
 async function refresh() {
   const d = await fetch(`/api/contexts/${contextId}`).then(r => r.json());
   const { context: ctx, totals, calls } = d;
 
-  // Header — only set once
   if (!headerLoaded) {
     document.title = `tokenledger — ${ctx.name}`;
-    document.getElementById('ctx-name').textContent = ctx.name;
+    document.getElementById('ctx-name').textContent       = ctx.name;
     document.getElementById('ctx-name-crumb').textContent = ctx.name;
     document.getElementById('ctx-source').innerHTML =
-      `<span class="source-badge source-${ctx.source}">${ctx.source}</span>`;
+      `<span class="badge-source badge-${ctx.source}">${ctx.source}</span>`;
     document.getElementById('ctx-started').textContent =
       `started ${ctx.started_at.slice(0,16).replace('T',' ')}`;
     headerLoaded = true;
@@ -145,54 +261,52 @@ async function refresh() {
   document.getElementById('ctx-ended').textContent =
     ctx.ended_at ? `ended ${ctx.ended_at.slice(0,16).replace('T',' ')}` : 'active';
 
-  // Stat cards
   document.getElementById('stat-cost').textContent  = fmt.cost(totals.total_cost);
   document.getElementById('stat-calls').textContent = fmt.num(totals.call_count);
   document.getElementById('stat-in').textContent    = fmt.short(totals.total_input_tokens);
   document.getElementById('stat-out').textContent   = fmt.short(totals.total_output_tokens);
 
-  // Cumulative cost chart
   if (calls.length) {
     let running = 0;
     const labels = calls.map((_, i) => `#${i+1}`);
-    const data   = calls.map(c => { running += (c.total_cost||0); return running; });
-    if (timelineChart) {
-      timelineChart.data.labels = labels;
-      timelineChart.data.datasets[0].data = data;
-      timelineChart.update();
+    const data   = calls.map(c => { running += (c.total_cost||0); return +running.toFixed(6); });
+    const c = chartColors();
+    if (tlChart) {
+      tlChart.data.labels = labels;
+      tlChart.data.datasets[0].data = data;
+      tlChart.update();
     } else {
-      timelineChart = new Chart(document.getElementById('chart-timeline'), {
+      tlChart = new Chart(document.getElementById('chart-timeline'), {
         type: 'line',
-        data: { labels, datasets:[{ label:'Cumulative cost', data,
-          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
-          fill:true, tension:0.2, pointRadius:2 }] },
+        data: { labels, datasets: [{ label: 'Cumulative ($)', data,
+          borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.07)',
+          fill: true, tension: 0.3, pointRadius: 2.5, borderWidth: 2 }] },
         options: {
-          responsive:true, maintainAspectRatio:true,
-          plugins:{ legend:{display:false} },
+          responsive: true, maintainAspectRatio: true,
+          plugins: { legend: { display: false } },
           scales: {
-            x: { ticks:{color:'#64748b',maxTicksLimit:12}, grid:{color:'#1e293b'} },
-            y: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
+            x: { ticks: { color: c.tick, maxTicksLimit: 12, font: { size: 11 } }, grid: { color: c.grid } },
+            y: { ticks: { color: c.tick, callback: v => `$${v.toFixed(3)}`, font: { size: 11 } }, grid: { color: c.grid }, beginAtZero: true },
           },
         },
       });
     }
   }
 
-  // Call table
   const tbody = document.getElementById('calls-tbody');
   tbody.innerHTML = calls.length
-    ? calls.map((c,i) => `<tr>
-        <td class="muted mono">${i+1}</td>
-        <td class="muted mono">${c.timestamp.slice(0,19).replace('T',' ')}</td>
+    ? calls.map((c, i) => `<tr>
+        <td class="mono text-muted">${i+1}</td>
+        <td class="mono text-muted">${c.timestamp.slice(0,19).replace('T',' ')}</td>
         <td><span class="model-tag">${shortModel(c.model)}</span></td>
-        <td class="mono muted" style="text-align:right">${fmt.num(c.input_tokens||0)}</td>
-        <td class="mono muted" style="text-align:right">${fmt.num(c.output_tokens||0)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(c.input_tokens||0)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(c.output_tokens||0)}</td>
         <td class="cost" style="text-align:right">${fmt.cost(c.total_cost)}</td>
       </tr>`).join('')
-    : '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">No calls recorded.</td></tr>';
+    : '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:32px">No calls recorded.</td></tr>';
 
-  document.getElementById('last-updated').textContent =
-    `updated ${new Date().toLocaleTimeString()}`;
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('last-updated').textContent = t;
 }
 
 refresh();
