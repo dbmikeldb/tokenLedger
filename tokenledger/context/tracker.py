@@ -29,10 +29,7 @@ def _git_branch_at(cwd: str) -> str | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=cwd,
-            timeout=2,
+            capture_output=True, text=True, cwd=cwd, timeout=2,
         )
         if result.returncode == 0:
             branch = result.stdout.strip()
@@ -40,6 +37,21 @@ def _git_branch_at(cwd: str) -> str | None:
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
     return None
+
+
+def _git_repo_at(cwd: str) -> str:
+    """Return the repo name (directory basename of the git root), or ''."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, cwd=cwd, timeout=2,
+        )
+        if result.returncode == 0:
+            toplevel = result.stdout.strip()
+            return Path(toplevel).name if toplevel else ""
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return ""
 
 
 def _most_active_git_branch() -> str | None:
@@ -75,17 +87,36 @@ def _most_active_git_branch() -> str | None:
 def resolve_context(
     manual_label: str | None = None,
     cwd: str | None = None,
-) -> tuple[str, str]:
-    """Return (context_name, source) for the current work session.
+) -> tuple[str, str, str]:
+    """Return (context_name, source, repo) for the current work session.
 
     Priority: manual label > git branch > 'untagged'
     """
     if manual_label:
-        return manual_label, "manual"
+        return manual_label, "manual", ""
     branch = detect_git_branch(cwd)
     if branch:
-        return branch, "git"
-    return "untagged", "manual"
+        effective_cwd = cwd or str(Path.home())
+        repo = _git_repo_at(effective_cwd) or _repo_from_most_active(cwd)
+        return branch, "git", repo
+    return "untagged", "manual", ""
+
+
+def _repo_from_most_active(cwd: str | None) -> str:
+    """Return the repo name from the most recently active git repo."""
+    home = Path.home()
+    best: tuple[float, str] | None = None
+    for head_file in list(home.glob("*/.git/HEAD")) + list(home.glob("*/*/.git/HEAD")):
+        try:
+            mtime = head_file.stat().st_mtime
+            if best and mtime <= best[0]:
+                continue
+            repo = _git_repo_at(str(head_file.parent.parent))
+            if repo:
+                best = (mtime, repo)
+        except OSError:
+            pass
+    return best[1] if best else ""
 
 
 def ensure_context(
@@ -93,21 +124,16 @@ def ensure_context(
     cwd: str | None = None,
     db_path: str | None = None,
 ) -> int:
-    """Return the active context_id, opening a new one if the context has changed.
-
-    If the current git branch differs from the open context's name, the old
-    context is closed and a new one is opened automatically.
-    """
-    name, source = resolve_context(manual_label, cwd)
+    """Return the active context_id, opening a new one if the context has changed."""
+    name, source, repo = resolve_context(manual_label, cwd)
     existing = get_open_context(db_path)
 
     if existing is not None:
-        if existing["name"] == name:
+        if existing["name"] == name and existing["repo"] == repo:
             return existing["id"]
-        # Context changed — close the old one
         close_context(existing["id"], db_path)
 
-    return open_context(name, source, db_path)
+    return open_context(name, source, repo, db_path)
 
 
 def set_manual_context(label: str, db_path: str | None = None) -> int:
@@ -115,7 +141,7 @@ def set_manual_context(label: str, db_path: str | None = None) -> int:
     existing = get_open_context(db_path)
     if existing is not None:
         close_context(existing["id"], db_path)
-    return open_context(label, "manual", db_path)
+    return open_context(label, "manual", "", db_path)
 
 
 def clear_context(db_path: str | None = None) -> None:
