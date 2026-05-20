@@ -21,7 +21,7 @@ def db(tmp_path):
 
 class TestContextLifecycle:
     def test_open_and_retrieve(self, db):
-        ctx_id = open_context("feat/auth", "git", db)
+        ctx_id = open_context("feat/auth", "git", db_path=db)
         ctx = get_open_context(db)
         assert ctx is not None
         assert ctx["name"] == "feat/auth"
@@ -29,14 +29,14 @@ class TestContextLifecycle:
         assert ctx["id"] == ctx_id
 
     def test_close_context(self, db):
-        ctx_id = open_context("feat/auth", "git", db)
+        ctx_id = open_context("feat/auth", "git", db_path=db)
         close_context(ctx_id, db)
         assert get_open_context(db) is None
 
     def test_most_recent_open_returned(self, db):
-        open_context("first", "manual", db)
+        open_context("first", "manual", db_path=db)
         close_context(1, db)
-        open_context("second", "git", db)
+        open_context("second", "git", db_path=db)
         ctx = get_open_context(db)
         assert ctx["name"] == "second"
 
@@ -46,7 +46,7 @@ class TestContextLifecycle:
 
 class TestCallRecording:
     def test_record_and_retrieve(self, db):
-        ctx_id = open_context("feat/test", "git", db)
+        ctx_id = open_context("feat/test", "git", db_path=db)
         record_call(
             context_id=ctx_id,
             model="claude-sonnet-4-20250514",
@@ -82,7 +82,7 @@ class TestCallRecording:
 
 class TestSummaryQuery:
     def test_summary_aggregates_correctly(self, db):
-        ctx_id = open_context("feat/x", "git", db)
+        ctx_id = open_context("feat/x", "git", db_path=db)
         for i in range(3):
             record_call(
                 context_id=ctx_id,

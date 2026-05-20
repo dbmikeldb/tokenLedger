@@ -244,6 +244,59 @@
     .text-muted { color: var(--text-muted); }
     .empty { color: var(--text-muted); text-align: center; padding: 40px; font-size: 13px; }
 
+    /* Table controls */
+    .table-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 6px 11px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus { border-color: var(--accent); }
+    .filter-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+    .result-count { font-size: 11px; color: var(--text-muted); white-space: nowrap; margin-left: auto; }
+
+    /* Sortable headers */
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: var(--text); }
+    th.sortable .sort-icon { margin-left: 4px; opacity: .4; font-size: 9px; }
+    th.sortable.asc .sort-icon::after  { content: '▲'; opacity: 1; }
+    th.sortable.desc .sort-icon::after { content: '▼'; opacity: 1; }
+    th.sortable:not(.asc):not(.desc) .sort-icon::after { content: '⇅'; }
+
+    .repo-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--accent-dim);
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+
     /* Badges */
     .badge-source {
       font-size: 10px;
@@ -314,21 +367,33 @@
       </div>
     </div>
 
-    <div class="table-header">Contexts</div>
+    <div class="table-controls">
+      <input class="search-input" id="ctx-search" type="search" placeholder="Search contexts…" oninput="renderTable()">
+      <select class="filter-select" id="repo-filter" onchange="renderTable()">
+        <option value="">All repos</option>
+      </select>
+      <select class="filter-select" id="source-filter" onchange="renderTable()">
+        <option value="">All sources</option>
+        <option value="git">git</option>
+        <option value="manual">manual</option>
+      </select>
+      <span class="result-count" id="result-count"></span>
+    </div>
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Context</th>
+            <th class="sortable" data-col="name" onclick="sortBy('name')">Context <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="repo" onclick="sortBy('repo')">Repo <span class="sort-icon"></span></th>
             <th>Source</th>
-            <th style="text-align:right">Calls</th>
-            <th style="text-align:right">Input</th>
-            <th style="text-align:right">Output</th>
-            <th style="text-align:right">Cost</th>
+            <th class="sortable" data-col="call_count" onclick="sortBy('call_count')" style="text-align:right">Calls <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="total_input_tokens" onclick="sortBy('total_input_tokens')" style="text-align:right">Input <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="total_output_tokens" onclick="sortBy('total_output_tokens')" style="text-align:right">Output <span class="sort-icon"></span></th>
+            <th class="sortable" data-col="total_cost" onclick="sortBy('total_cost')" style="text-align:right">Cost <span class="sort-icon"></span></th>
           </tr>
         </thead>
         <tbody id="contexts-tbody">
-          <tr><td colspan="6" class="empty">Loading…</td></tr>
+          <tr><td colspan="7" class="empty">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -389,6 +454,66 @@ function rebuildChartColors() {
 const _toggleTheme = toggleTheme;
 window.toggleTheme = function() { _toggleTheme(); rebuildChartColors(); };
 
+// Table state
+let allContexts = [];
+let sortCol = 'id';
+let sortDir = 'desc';  // newest first by default
+
+function sortBy(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = col === 'name' || col === 'repo' ? 'asc' : 'desc';
+  }
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.classList.remove('asc', 'desc');
+    if (th.dataset.col === col) th.classList.add(sortDir);
+  });
+  renderTable();
+}
+
+function renderTable() {
+  const search = document.getElementById('ctx-search').value.toLowerCase();
+  const repoF  = document.getElementById('repo-filter').value;
+  const srcF   = document.getElementById('source-filter').value;
+
+  let rows = allContexts.filter(r => {
+    if (repoF && r.repo !== repoF) return false;
+    if (srcF  && r.source !== srcF) return false;
+    if (search) {
+      const haystack = `${r.name} ${r.repo} ${r.source}`.toLowerCase();
+      if (!search.split(' ').every(t => haystack.includes(t))) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+    const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  document.getElementById('result-count').textContent =
+    rows.length < allContexts.length ? `${rows.length} of ${allContexts.length}` : `${rows.length} contexts`;
+
+  const tbody = document.getElementById('contexts-tbody');
+  tbody.innerHTML = rows.length
+    ? rows.map(r => `<tr class="${r.is_active ? 'active-row' : ''}">
+        <td>
+          <a href="/context/${r.id}">${r.name}</a>
+          ${r.is_active ? '<span class="live-dot" style="margin-left:7px;display:inline-block;vertical-align:middle"></span>' : ''}
+        </td>
+        <td>${r.repo ? `<span class="repo-tag">${r.repo}</span>` : '<span style="color:var(--text-subtle)">—</span>'}</td>
+        <td><span class="badge-source badge-${r.source}">${r.source}</span></td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(r.call_count)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
+        <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="7" class="empty">No contexts match.</td></tr>`;
+}
+
 // Data loading
 async function refreshSummary() {
   const d = await fetch('/api/summary').then(r => r.json());
@@ -439,56 +564,54 @@ async function refreshTimeline() {
 
 async function refreshContexts() {
   const data = await fetch('/api/contexts').then(r => r.json());
-  const top  = data.slice(0, 10);
-  const c    = chartColors();
+  allContexts = data;
 
+  // Active banner
   const active = data.find(r => r.is_active);
   const banner = document.getElementById('recording-banner');
   if (active) {
-    document.getElementById('recording-name').textContent   = active.name;
+    const label = active.repo ? `${active.repo} / ${active.name}` : active.name;
+    document.getElementById('recording-name').textContent   = label;
     document.getElementById('recording-source').textContent = `(${active.source})`;
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
   }
 
-  const cfg = {
-    type: 'bar',
-    data: {
-      labels: top.map(d => d.name),
-      datasets: [{ label: 'Cost ($)', data: top.map(d => d.total_cost), backgroundColor: BLUES[0], borderRadius: 4, borderSkipped: false }],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true, indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: c.tick, callback: v => `$${v.toFixed(3)}`, font: { size: 11 } }, grid: { color: c.grid }, beginAtZero: true },
-        y: { ticks: { color: c.tick, font: { size: 11 } }, grid: { color: 'transparent' } },
-      },
-    },
-  };
+  // Repo filter dropdown — preserve current selection
+  const repoSel = document.getElementById('repo-filter');
+  const prevRepo = repoSel.value;
+  const repos = [...new Set(data.map(r => r.repo).filter(Boolean))].sort();
+  repoSel.innerHTML = '<option value="">All repos</option>' +
+    repos.map(r => `<option value="${r}" ${r===prevRepo?'selected':''}>${r}</option>`).join('');
+
+  // Context bar chart (top 10 by cost)
+  const top = [...data].sort((a,b) => b.total_cost - a.total_cost).slice(0, 10);
+  const c   = chartColors();
+  const barLabel = r => r.repo ? `${r.repo}/${r.name}` : r.name;
   if (charts.ctxBar) {
-    charts.ctxBar.data.labels = cfg.data.labels;
-    charts.ctxBar.data.datasets[0].data = cfg.data.datasets[0].data;
+    charts.ctxBar.data.labels = top.map(barLabel);
+    charts.ctxBar.data.datasets[0].data = top.map(d => d.total_cost);
     charts.ctxBar.update();
   } else if (top.length) {
-    charts.ctxBar = new Chart(document.getElementById('chart-contexts'), cfg);
+    charts.ctxBar = new Chart(document.getElementById('chart-contexts'), {
+      type: 'bar',
+      data: {
+        labels: top.map(barLabel),
+        datasets: [{ label:'Cost ($)', data:top.map(d=>d.total_cost), backgroundColor:BLUES[0], borderRadius:4, borderSkipped:false }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true, indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks:{color:c.tick,callback:v=>`$${v.toFixed(3)}`,font:{size:11}}, grid:{color:c.grid}, beginAtZero:true },
+          y: { ticks:{color:c.tick,font:{size:11}}, grid:{color:'transparent'} },
+        },
+      },
+    });
   }
 
-  const tbody = document.getElementById('contexts-tbody');
-  tbody.innerHTML = data.length
-    ? data.map(r => `<tr class="${r.is_active ? 'active-row' : ''}">
-        <td>
-          <a href="/context/${r.id}">${r.name}</a>
-          ${r.is_active ? '<span class="live-dot" style="margin-left:7px;display:inline-block;vertical-align:middle"></span>' : ''}
-        </td>
-        <td><span class="badge-source badge-${r.source}">${r.source}</span></td>
-        <td class="mono text-muted" style="text-align:right">${fmt.num(r.call_count)}</td>
-        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
-        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
-        <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
-      </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No data yet — start <code>tokenledger serve</code> and make some API calls.</td></tr>';
+  renderTable();
 }
 
 async function refreshModels() {

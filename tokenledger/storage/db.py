@@ -28,10 +28,11 @@ def init_db(db_path: str | None = None) -> str:
     with sqlite3.connect(path) as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS contexts (
-                id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                name      TEXT    NOT NULL,
-                source    TEXT    NOT NULL CHECK(source IN ('git', 'manual')),
-                started_at TEXT   NOT NULL,
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT    NOT NULL,
+                repo       TEXT    NOT NULL DEFAULT '',
+                source     TEXT    NOT NULL CHECK(source IN ('git', 'manual')),
+                started_at TEXT    NOT NULL,
                 ended_at   TEXT
             );
 
@@ -48,9 +49,13 @@ def init_db(db_path: str | None = None) -> str:
                 request_id    TEXT
             );
 
-            CREATE INDEX IF NOT EXISTS idx_calls_context  ON calls(context_id);
+            CREATE INDEX IF NOT EXISTS idx_calls_context   ON calls(context_id);
             CREATE INDEX IF NOT EXISTS idx_calls_timestamp ON calls(timestamp);
         """)
+        # Migrate existing DBs that predate the repo column
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(contexts)")}
+        if "repo" not in cols:
+            conn.execute("ALTER TABLE contexts ADD COLUMN repo TEXT NOT NULL DEFAULT ''")
     return path
 
 
@@ -73,13 +78,13 @@ def get_conn(db_path: str | None = None):
 # Context operations
 # ---------------------------------------------------------------------------
 
-def open_context(name: str, source: str, db_path: str | None = None) -> int:
+def open_context(name: str, source: str, repo: str = "", db_path: str | None = None) -> int:
     """Open a new context session. Returns the new context id."""
     now = datetime.now(tz=timezone.utc).isoformat()
     with get_conn(db_path) as conn:
         cur = conn.execute(
-            "INSERT INTO contexts (name, source, started_at) VALUES (?, ?, ?)",
-            (name, source, now),
+            "INSERT INTO contexts (name, repo, source, started_at) VALUES (?, ?, ?, ?)",
+            (name, repo, source, now),
         )
         return cur.lastrowid
 
@@ -141,13 +146,14 @@ def get_context_summary(db_path: str | None = None) -> list[sqlite3.Row]:
             SELECT
                 c.id,
                 c.name,
+                c.repo,
                 c.source,
                 c.started_at,
                 c.ended_at,
-                COUNT(ca.id)        AS call_count,
-                SUM(ca.total_cost)  AS total_cost,
-                SUM(ca.input_tokens)  AS total_input_tokens,
-                SUM(ca.output_tokens) AS total_output_tokens
+                COUNT(ca.id)                     AS call_count,
+                COALESCE(SUM(ca.total_cost), 0)  AS total_cost,
+                COALESCE(SUM(ca.input_tokens), 0)  AS total_input_tokens,
+                COALESCE(SUM(ca.output_tokens), 0) AS total_output_tokens
             FROM contexts c
             LEFT JOIN calls ca ON ca.context_id = c.id
             GROUP BY c.id
