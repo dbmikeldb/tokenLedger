@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tokenledger</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --border:   #334155;
+      --text:     #e2e8f0;
+      --muted:    #94a3b8;
+      --accent:   #3b82f6;
+      --green:    #22c55e;
+      --amber:    #f59e0b;
+      --red:      #ef4444;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+
+    header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+    header span { color: var(--muted); font-size: 12px; }
+    .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+
+    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+
+    /* Stat cards */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .card-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .card-value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+    .card-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    /* Charts grid */
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    .chart-wide { grid-column: 1 / -1; }
+    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+    .chart-box canvas { max-height: 260px; }
+
+    /* Context table */
+    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    th { text-align: left; padding: 10px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; }
+    td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .mono { font-family: ui-monospace, monospace; }
+    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, monospace; }
+    .muted { color: var(--muted); }
+    .source-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .source-git    { background: rgba(59,130,246,0.15); color: var(--accent); }
+    .source-manual { background: rgba(245,158,11,0.15); color: var(--amber); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .empty { color: var(--muted); text-align: center; padding: 40px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">TL</div>
+    <h1>tokenledger</h1>
+    <span id="db-path"></span>
+  </header>
+
+  <main>
+    <!-- Stat cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">All time</div>
+        <div class="card-value" id="stat-alltime">—</div>
+        <div class="card-sub" id="stat-calls">— calls</div>
+      </div>
+      <div class="card">
+        <div class="card-label">This week</div>
+        <div class="card-value" id="stat-week">—</div>
+        <div class="card-sub">last 7 days</div>
+      </div>
+      <div class="card">
+        <div class="card-label">This month</div>
+        <div class="card-value" id="stat-month">—</div>
+        <div class="card-sub">last 30 days</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tokens (all time)</div>
+        <div class="card-value" id="stat-tokens">—</div>
+        <div class="card-sub" id="stat-tokens-sub">— in / — out</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts">
+      <div class="chart-box chart-wide">
+        <div class="chart-title">Daily spend — last 30 days</div>
+        <canvas id="chart-timeline"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Cost by context</div>
+        <canvas id="chart-contexts"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">Model breakdown</div>
+        <canvas id="chart-models"></canvas>
+      </div>
+    </div>
+
+    <!-- Context table -->
+    <div class="section-title">Contexts</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Context</th>
+          <th>Source</th>
+          <th style="text-align:right">Calls</th>
+          <th style="text-align:right">Input tokens</th>
+          <th style="text-align:right">Output tokens</th>
+          <th style="text-align:right">Total cost</th>
+        </tr>
+      </thead>
+      <tbody id="contexts-tbody">
+        <tr><td colspan="6" class="empty">Loading...</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+<script>
+const fmt = {
+  cost:  v => `$${(v||0).toFixed(4)}`,
+  num:   v => (v||0).toLocaleString(),
+  short: v => {
+    if (v >= 1e6) return `${(v/1e6).toFixed(1)}M`;
+    if (v >= 1e3) return `${(v/1e3).toFixed(1)}K`;
+    return String(v||0);
+  },
+};
+
+const CHART_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899'];
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: true,
+  plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+};
+
+async function loadSummary() {
+  const d = await fetch('/api/summary').then(r => r.json());
+  document.getElementById('stat-alltime').textContent = fmt.cost(d.all_time);
+  document.getElementById('stat-week').textContent    = fmt.cost(d.this_week);
+  document.getElementById('stat-month').textContent   = fmt.cost(d.this_month);
+  document.getElementById('stat-calls').textContent   = `${fmt.num(d.call_count)} calls`;
+  const total = (d.total_input_tokens||0) + (d.total_output_tokens||0);
+  document.getElementById('stat-tokens').textContent     = fmt.short(total);
+  document.getElementById('stat-tokens-sub').textContent =
+    `${fmt.short(d.total_input_tokens)} in / ${fmt.short(d.total_output_tokens)} out`;
+}
+
+async function loadTimeline() {
+  const data = await fetch('/api/timeline?days=30').then(r => r.json());
+  if (!data.length) return;
+  new Chart(document.getElementById('chart-timeline'), {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.day),
+      datasets: [{
+        label: 'Daily spend ($)',
+        data: data.map(d => d.daily_cost),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#3b82f6',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { color: '#1e293b' } },
+        y: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
+      },
+      plugins: { ...chartDefaults.plugins, legend: { display: false } },
+    },
+  });
+}
+
+async function loadContextChart() {
+  const data = await fetch('/api/contexts').then(r => r.json());
+  if (!data.length) return;
+  const top = data.slice(0, 10);
+  new Chart(document.getElementById('chart-contexts'), {
+    type: 'bar',
+    data: {
+      labels: top.map(d => d.name),
+      datasets: [{
+        label: 'Cost ($)',
+        data: top.map(d => d.total_cost),
+        backgroundColor: CHART_COLORS[0],
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      indexAxis: 'y',
+      scales: {
+        x: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
+        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+      },
+      plugins: { ...chartDefaults.plugins, legend: { display: false } },
+    },
+  });
+
+  // Also populate table
+  const tbody = document.getElementById('contexts-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No data yet. Start tokenledger serve and make some API calls.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><a href="/context/${r.id}">${r.name}</a></td>
+      <td><span class="source-badge source-${r.source}">${r.source}</span></td>
+      <td class="mono muted" style="text-align:right">${fmt.num(r.call_count)}</td>
+      <td class="mono muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
+      <td class="mono muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
+      <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
+    </tr>`).join('');
+}
+
+async function loadModels() {
+  const data = await fetch('/api/models').then(r => r.json());
+  if (!data.length) return;
+  const shortName = m => m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : m.includes('haiku') ? 'haiku' : m;
+  new Chart(document.getElementById('chart-models'), {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => shortName(d.model)),
+      datasets: [{
+        data: data.map(d => d.total_cost),
+        backgroundColor: CHART_COLORS,
+        borderColor: '#1e293b',
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt.cost(ctx.raw)} (${ctx.formattedValue})` } },
+      },
+    },
+  });
+}
+
+loadSummary();
+loadTimeline();
+loadContextChart();
+loadModels();
+</script>
+</body>
+</html>

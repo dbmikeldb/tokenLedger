@@ -55,6 +55,19 @@ def cmd_context(args: argparse.Namespace) -> None:
         print("No active context. Use 'tokenledger context <label>' to set one.")
 
 
+def cmd_ui(args: argparse.Namespace) -> None:
+    try:
+        from tokenledger.web.server import run_ui
+    except ImportError:
+        print(
+            "Error: web dependencies not installed.\n"
+            "Install with: pip install tokenledger[proxy]",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    run_ui(host=args.host, port=args.port)
+
+
 def cmd_report(args: argparse.Namespace) -> None:
     from tokenledger.storage.db import get_calls_for_context, get_context_summary, init_db
 
@@ -139,6 +152,11 @@ def main() -> None:
     ctx.add_argument("label", nargs="?", help="Label for this work session (e.g. branch name)")
     ctx.add_argument("--clear", action="store_true", help="Close the current context")
 
+    # ui
+    ui = sub.add_parser("ui", help="Open the web dashboard")
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--port", type=int, default=8787)
+
     # report
     report = sub.add_parser("report", help="Show cost breakdown by context")
     report.add_argument(
@@ -154,6 +172,8 @@ def main() -> None:
         cmd_serve(args)
     elif args.command == "context":
         cmd_context(args)
+    elif args.command == "ui":
+        cmd_ui(args)
     elif args.command == "report":
         cmd_report(args)
     else:
