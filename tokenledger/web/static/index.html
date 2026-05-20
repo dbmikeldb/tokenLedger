@@ -287,6 +287,33 @@
     th.sortable.desc .sort-icon::after { content: '▼'; opacity: 1; }
     th.sortable:not(.asc):not(.desc) .sort-icon::after { content: '⇅'; }
 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+      width: fit-content;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-radius: 5px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 14px;
+      transition: background .12s, color .12s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { background: var(--accent); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
     .repo-tag {
       font-size: 10px;
       font-weight: 600;
@@ -367,6 +394,12 @@
       </div>
     </div>
 
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-contexts" onclick="switchTab('contexts')">Contexts</button>
+      <button class="tab-btn" id="tab-repos" onclick="switchTab('repos')">Repos</button>
+    </div>
+
+    <div class="tab-panel active" id="panel-contexts">
     <div class="table-controls">
       <input class="search-input" id="ctx-search" type="search" placeholder="Search contexts…" oninput="renderTable()">
       <select class="filter-select" id="repo-filter" onchange="renderTable()">
@@ -397,6 +430,27 @@
         </tbody>
       </table>
     </div>
+    </div><!-- /panel-contexts -->
+
+    <div class="tab-panel" id="panel-repos">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="sortable" data-repo-col="repo" onclick="sortRepoBy('repo')">Repo <span class="sort-icon"></span></th>
+            <th class="sortable" data-repo-col="context_count" onclick="sortRepoBy('context_count')" style="text-align:right">Contexts <span class="sort-icon"></span></th>
+            <th class="sortable" data-repo-col="call_count" onclick="sortRepoBy('call_count')" style="text-align:right">Calls <span class="sort-icon"></span></th>
+            <th class="sortable" data-repo-col="total_input_tokens" onclick="sortRepoBy('total_input_tokens')" style="text-align:right">Input <span class="sort-icon"></span></th>
+            <th class="sortable" data-repo-col="total_output_tokens" onclick="sortRepoBy('total_output_tokens')" style="text-align:right">Output <span class="sort-icon"></span></th>
+            <th class="sortable" data-repo-col="total_cost" onclick="sortRepoBy('total_cost')" style="text-align:right">Cost <span class="sort-icon"></span></th>
+          </tr>
+        </thead>
+        <tbody id="repos-tbody">
+          <tr><td colspan="6" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    </div><!-- /panel-repos -->
   </main>
 
 <script>
@@ -453,6 +507,51 @@ function rebuildChartColors() {
 // Patch toggleTheme to also recolor charts
 const _toggleTheme = toggleTheme;
 window.toggleTheme = function() { _toggleTheme(); rebuildChartColors(); };
+
+// Tab switching
+function switchTab(tab) {
+  ['contexts','repos'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`panel-${t}`).classList.toggle('active', t === tab);
+  });
+}
+
+// Repo table state
+let allRepos = [];
+let repoSortCol = 'total_cost';
+let repoSortDir = 'desc';
+
+function sortRepoBy(col) {
+  if (repoSortCol === col) {
+    repoSortDir = repoSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    repoSortCol = col;
+    repoSortDir = col === 'repo' ? 'asc' : 'desc';
+  }
+  document.querySelectorAll('[data-repo-col]').forEach(th => {
+    th.classList.remove('asc','desc');
+    if (th.dataset.repoCol === col) th.classList.add(repoSortDir);
+  });
+  renderRepoTable();
+}
+
+function renderRepoTable() {
+  const rows = [...allRepos].sort((a,b) => {
+    const av = a[repoSortCol] ?? '', bv = b[repoSortCol] ?? '';
+    const cmp = typeof av === 'number' ? av - bv : String(av).localeCompare(String(bv));
+    return repoSortDir === 'asc' ? cmp : -cmp;
+  });
+  document.getElementById('repos-tbody').innerHTML = rows.length
+    ? rows.map(r => `<tr>
+        <td><strong>${r.repo}</strong></td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(r.context_count)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(r.call_count)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
+        <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No repo data yet.</td></tr>';
+}
 
 // Table state
 let allContexts = [];
@@ -648,8 +747,14 @@ async function refreshModels() {
   }
 }
 
+async function refreshRepos() {
+  const data = await fetch('/api/repos').then(r => r.json());
+  allRepos = data;
+  renderRepoTable();
+}
+
 async function refresh() {
-  await Promise.all([refreshSummary(), refreshTimeline(), refreshContexts(), refreshModels()]);
+  await Promise.all([refreshSummary(), refreshTimeline(), refreshContexts(), refreshModels(), refreshRepos()]);
   const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
   document.getElementById('last-updated').textContent = t;
 }

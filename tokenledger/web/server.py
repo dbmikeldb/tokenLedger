@@ -118,6 +118,26 @@ def api_timeline(days: int = 30) -> list[dict[str, Any]]:
 # API — model breakdown (donut chart)
 # ---------------------------------------------------------------------------
 
+@app.get("/api/repos")
+def api_repos() -> list[dict[str, Any]]:
+    """Per-repo aggregation — total cost, calls, tokens across all contexts."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                COALESCE(NULLIF(c.repo, ''), '(untracked)') AS repo,
+                COUNT(DISTINCT c.id)                         AS context_count,
+                COUNT(ca.id)                                 AS call_count,
+                COALESCE(SUM(ca.total_cost), 0)              AS total_cost,
+                COALESCE(SUM(ca.input_tokens), 0)            AS total_input_tokens,
+                COALESCE(SUM(ca.output_tokens), 0)           AS total_output_tokens
+            FROM contexts c
+            LEFT JOIN calls ca ON ca.context_id = c.id
+            GROUP BY repo
+            ORDER BY total_cost DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/models")
 def api_models() -> list[dict[str, Any]]:
     with _conn() as conn:
