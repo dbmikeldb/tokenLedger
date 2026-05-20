@@ -26,19 +26,22 @@ class TestResolveContext:
         assert source == "manual"
 
     def test_git_branch_detected(self):
-        with patch(
-            "tokenledger.context.tracker.detect_git_branch",
-            return_value="feat/login",
-        ):
+        with patch("tokenledger.context.tracker._git_branch_at", return_value="feat/login"), \
+             patch("tokenledger.context.tracker._most_active_git_branch", return_value=None):
             name, source = resolve_context()
         assert name == "feat/login"
         assert source == "git"
 
+    def test_falls_back_to_most_active_repo(self):
+        with patch("tokenledger.context.tracker._git_branch_at", return_value=None), \
+             patch("tokenledger.context.tracker._most_active_git_branch", return_value="feat/from-other-repo"):
+            name, source = resolve_context()
+        assert name == "feat/from-other-repo"
+        assert source == "git"
+
     def test_falls_back_to_untagged(self):
-        with patch(
-            "tokenledger.context.tracker.detect_git_branch",
-            return_value=None,
-        ):
+        with patch("tokenledger.context.tracker._git_branch_at", return_value=None), \
+             patch("tokenledger.context.tracker._most_active_git_branch", return_value=None):
             name, source = resolve_context()
         assert name == "untagged"
         assert source == "manual"
