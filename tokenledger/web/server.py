@@ -80,6 +80,7 @@ def api_contexts() -> list[dict[str, Any]]:
                 c.source,
                 c.started_at,
                 c.ended_at,
+                CASE WHEN c.ended_at IS NULL THEN 1 ELSE 0 END AS is_active,
                 COUNT(ca.id)                     AS call_count,
                 COALESCE(SUM(ca.total_cost), 0)  AS total_cost,
                 COALESCE(SUM(ca.input_tokens), 0)  AS total_input_tokens,
