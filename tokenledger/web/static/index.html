@@ -1,100 +1,286 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>tokenledger</title>
+  <script>
+    // Apply saved theme before first paint
+    (function() {
+      const t = localStorage.getItem('tl-theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    :root {
-      --bg:       #0f172a;
-      --surface:  #1e293b;
-      --border:   #334155;
-      --text:     #e2e8f0;
-      --muted:    #94a3b8;
-      --accent:   #3b82f6;
-      --green:    #22c55e;
-      --amber:    #f59e0b;
-      --red:      #ef4444;
+    :root[data-theme="dark"] {
+      --bg:           #0e131a;
+      --bg-raised:    #131b24;
+      --surface:      #19232f;
+      --surface-2:    #1f2d3d;
+      --border:       #253347;
+      --border-subtle:#1b2a3a;
+      --text:         #dce8f5;
+      --text-muted:   #6e8ca8;
+      --text-subtle:  #3d576e;
+      --accent:       #4a90d9;
+      --accent-dim:   rgba(74,144,217,0.12);
+      --accent-dimmer:rgba(74,144,217,0.06);
+      --green:        #38c78a;
+      --green-dim:    rgba(56,199,138,0.10);
+      --amber:        #e8a84c;
+      --red:          #e05c5c;
+      --shadow:       0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-sm:    0 1px 2px rgba(0,0,0,0.3);
+    }
+    :root[data-theme="light"] {
+      --bg:           #eaf0f8;
+      --bg-raised:    #f0f5fb;
+      --surface:      #ffffff;
+      --surface-2:    #f5f8fc;
+      --border:       #d0dae8;
+      --border-subtle:#e3eaf4;
+      --text:         #1a2638;
+      --text-muted:   #55718f;
+      --text-subtle:  #9ab0c8;
+      --accent:       #2370be;
+      --accent-dim:   rgba(35,112,190,0.08);
+      --accent-dimmer:rgba(35,112,190,0.04);
+      --green:        #0d9e68;
+      --green-dim:    rgba(13,158,104,0.08);
+      --amber:        #c47d0a;
+      --red:          #c0392b;
+      --shadow:       0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-sm:    0 1px 2px rgba(0,0,0,0.06);
     }
 
-    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+    }
 
-    header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
-    header span { color: var(--muted); font-size: 12px; }
+    /* Header */
+    header {
+      height: 52px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-raised);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .wordmark {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+    }
+    .wordmark span { color: var(--accent); }
     header .spacer { flex: 1; }
-    .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
-    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .last-updated { color: var(--muted); font-size: 11px; }
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .live-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .theme-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px 8px;
+      line-height: 1;
+      transition: color .15s, background .15s;
+    }
+    .theme-btn:hover { color: var(--text); background: var(--surface-2); }
 
-    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    /* Layout */
+    main { padding: 24px; max-width: 1240px; margin: 0 auto; }
+
+    /* Recording banner */
+    .recording-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--green-dim);
+      border: 1px solid rgba(56,199,138,0.2);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+    .recording-banner.hidden { display: none; }
+    .recording-banner strong { color: var(--green); font-weight: 600; }
+    .recording-banner .muted { color: var(--text-muted); }
 
     /* Stat cards */
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-    .card-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
-    .card-value { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
-    .card-sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .card-value {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+    .card-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
 
-    /* Charts grid */
-    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+    /* Charts */
+    .charts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
     .chart-wide { grid-column: 1 / -1; }
-    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
-    .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
-    .chart-box canvas { max-height: 260px; }
+    .chart-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .chart-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .chart-box canvas { max-height: 240px; }
 
-    /* Context table */
-    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-    th { text-align: left; padding: 10px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; }
-    td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    /* Table */
+    .table-header {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      text-align: left;
+      padding: 9px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: middle;
+    }
     tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255,255,255,0.02); }
-    .mono { font-family: ui-monospace, monospace; }
-    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, monospace; }
-    .muted { color: var(--muted); }
-    .source-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-    .source-git    { background: rgba(59,130,246,0.15); color: var(--accent); }
-    .source-manual { background: rgba(245,158,11,0.15); color: var(--amber); }
+    tr:hover td { background: var(--accent-dimmer); }
+    tr.active-row td { background: var(--green-dim); }
+    tr.active-row td:first-child {
+      border-left: 3px solid var(--green);
+      padding-left: 13px;
+    }
+
+    /* Type utilities */
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    .mono { font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, 'SF Mono', Consolas, monospace; font-size: 12px; }
+    .text-muted { color: var(--text-muted); }
+    .empty { color: var(--text-muted); text-align: center; padding: 40px; font-size: 13px; }
 
-    .empty { color: var(--muted); text-align: center; padding: 40px; font-size: 13px; }
-    .recording-banner { display:flex; align-items:center; gap:10px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:8px; padding:12px 16px; margin-bottom:24px; font-size:13px; }
-    .recording-banner .live-dot { flex-shrink:0; }
-    .recording-banner strong { color: var(--green); }
-    .recording-banner.hidden { display:none; }
-    tr.active-row td { background: rgba(34,197,94,0.05); }
-    tr.active-row td:first-child { border-left: 3px solid var(--green); padding-left: 13px; }
+    /* Badges */
+    .badge-source {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+    }
+    .badge-git    { background: var(--accent-dim); color: var(--accent); }
+    .badge-manual { background: rgba(232,168,76,0.12); color: var(--amber); }
   </style>
 </head>
 <body>
   <header>
-    <div class="badge">TL</div>
-    <h1>tokenledger</h1>
+    <div class="wordmark">token<span>ledger</span></div>
     <div class="spacer"></div>
-    <span class="live-dot"></span>
-    <span class="last-updated" id="last-updated">loading…</span>
+    <div class="header-meta">
+      <div class="live-pill">
+        <div class="live-dot"></div>
+        <span id="last-updated">loading</span>
+      </div>
+      <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
+    </div>
   </header>
 
   <main>
-    <!-- Active context banner -->
     <div class="recording-banner hidden" id="recording-banner">
-      <span class="live-dot"></span>
+      <div class="live-dot"></div>
       <span>Recording: <strong id="recording-name"></strong></span>
       <span class="muted" id="recording-source"></span>
     </div>
 
-    <!-- Stat cards -->
     <div class="cards">
       <div class="card">
         <div class="card-label">All time</div>
         <div class="card-value" id="stat-alltime">—</div>
-        <div class="card-sub" id="stat-calls">— calls</div>
+        <div class="card-sub" id="stat-calls">—</div>
       </div>
       <div class="card">
         <div class="card-label">This week</div>
@@ -107,175 +293,242 @@
         <div class="card-sub">last 30 days</div>
       </div>
       <div class="card">
-        <div class="card-label">Tokens (all time)</div>
+        <div class="card-label">Tokens</div>
         <div class="card-value" id="stat-tokens">—</div>
         <div class="card-sub" id="stat-tokens-sub">— in / — out</div>
       </div>
     </div>
 
-    <!-- Charts -->
     <div class="charts">
       <div class="chart-box chart-wide">
-        <div class="chart-title">Daily spend — last 30 days</div>
+        <div class="chart-label">Daily spend — last 30 days</div>
         <canvas id="chart-timeline"></canvas>
       </div>
       <div class="chart-box">
-        <div class="chart-title">Cost by context</div>
+        <div class="chart-label">Cost by context</div>
         <canvas id="chart-contexts"></canvas>
       </div>
       <div class="chart-box">
-        <div class="chart-title">Model breakdown</div>
+        <div class="chart-label">Model breakdown</div>
         <canvas id="chart-models"></canvas>
       </div>
     </div>
 
-    <!-- Context table -->
-    <div class="section-title">Contexts</div>
-    <table>
-      <thead>
-        <tr>
-          <th>Context</th>
-          <th>Source</th>
-          <th style="text-align:right">Calls</th>
-          <th style="text-align:right">Input tokens</th>
-          <th style="text-align:right">Output tokens</th>
-          <th style="text-align:right">Total cost</th>
-        </tr>
-      </thead>
-      <tbody id="contexts-tbody">
-        <tr><td colspan="6" class="empty">Loading...</td></tr>
-      </tbody>
-    </table>
+    <div class="table-header">Contexts</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Context</th>
+            <th>Source</th>
+            <th style="text-align:right">Calls</th>
+            <th style="text-align:right">Input</th>
+            <th style="text-align:right">Output</th>
+            <th style="text-align:right">Cost</th>
+          </tr>
+        </thead>
+        <tbody id="contexts-tbody">
+          <tr><td colspan="6" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 
 <script>
+// Theme
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('tl-theme', next);
+  document.getElementById('theme-btn').textContent = next === 'dark' ? '☀' : '☾';
+}
+document.getElementById('theme-btn').textContent =
+  (document.documentElement.getAttribute('data-theme') === 'dark') ? '☀' : '☾';
+
+// Helpers
 const fmt = {
   cost:  v => `$${(v||0).toFixed(4)}`,
   num:   v => (v||0).toLocaleString(),
   short: v => { if(v>=1e6) return `${(v/1e6).toFixed(1)}M`; if(v>=1e3) return `${(v/1e3).toFixed(1)}K`; return String(v||0); },
 };
-const CHART_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899'];
 const shortModel = m => m.includes('opus')?'opus':m.includes('sonnet')?'sonnet':m.includes('haiku')?'haiku':m;
-const CD = { responsive:true, maintainAspectRatio:true, plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}} };
+
+// Chart palette — blues and slate
+const BLUES = ['#4a90d9','#2d6fb3','#6aaee3','#1a4f8a','#8dc4ec','#3a7fc4','#a8d4f4'];
+
+function chartColors() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  return {
+    grid:    dark ? '#1d2e3e' : '#e0e9f3',
+    tick:    dark ? '#4a6880' : '#7a9ab8',
+    label:   dark ? '#6e8ca8' : '#55718f',
+  };
+}
 
 let charts = {};
 
-// --- Stat cards (DOM only, no chart) ---
+function rebuildChartColors() {
+  const c = chartColors();
+  Object.values(charts).forEach(ch => {
+    if (!ch) return;
+    if (ch.options.scales) {
+      ['x','y'].forEach(ax => {
+        if (ch.options.scales[ax]) {
+          if (ch.options.scales[ax].ticks) ch.options.scales[ax].ticks.color = c.tick;
+          if (ch.options.scales[ax].grid)  ch.options.scales[ax].grid.color  = c.grid;
+        }
+      });
+    }
+    if (ch.options.plugins?.legend?.labels) ch.options.plugins.legend.labels.color = c.label;
+    ch.update();
+  });
+}
+
+// Patch toggleTheme to also recolor charts
+const _toggleTheme = toggleTheme;
+window.toggleTheme = function() { _toggleTheme(); rebuildChartColors(); };
+
+// Data loading
 async function refreshSummary() {
   const d = await fetch('/api/summary').then(r => r.json());
   document.getElementById('stat-alltime').textContent = fmt.cost(d.all_time);
   document.getElementById('stat-week').textContent    = fmt.cost(d.this_week);
   document.getElementById('stat-month').textContent   = fmt.cost(d.this_month);
   document.getElementById('stat-calls').textContent   = `${fmt.num(d.call_count)} calls`;
-  const total = (d.total_input_tokens||0)+(d.total_output_tokens||0);
-  document.getElementById('stat-tokens').textContent     = fmt.short(total);
+  const tot = (d.total_input_tokens||0)+(d.total_output_tokens||0);
+  document.getElementById('stat-tokens').textContent     = fmt.short(tot);
   document.getElementById('stat-tokens-sub').textContent = `${fmt.short(d.total_input_tokens)} in / ${fmt.short(d.total_output_tokens)} out`;
 }
 
-// --- Timeline (create once, update data on refresh) ---
 async function refreshTimeline() {
   const data = await fetch('/api/timeline?days=30').then(r => r.json());
   if (!data.length) return;
+  const c = chartColors();
+  const cfg = {
+    type: 'line',
+    data: {
+      labels: data.map(d => d.day),
+      datasets: [{
+        label: 'Daily ($)',
+        data: data.map(d => d.daily_cost),
+        borderColor: BLUES[0],
+        backgroundColor: 'rgba(74,144,217,0.07)',
+        fill: true, tension: 0.35,
+        pointRadius: 3, pointBackgroundColor: BLUES[0],
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: c.tick, maxTicksLimit: 10, font: { size: 11 } }, grid: { color: c.grid } },
+        y: { ticks: { color: c.tick, callback: v => `$${v.toFixed(3)}`, font: { size: 11 } }, grid: { color: c.grid }, beginAtZero: true },
+      },
+    },
+  };
   if (charts.timeline) {
-    charts.timeline.data.labels = data.map(d => d.day);
-    charts.timeline.data.datasets[0].data = data.map(d => d.daily_cost);
+    charts.timeline.data.labels = cfg.data.labels;
+    charts.timeline.data.datasets[0].data = cfg.data.datasets[0].data;
     charts.timeline.update();
   } else {
-    charts.timeline = new Chart(document.getElementById('chart-timeline'), {
-      type: 'line',
-      data: {
-        labels: data.map(d => d.day),
-        datasets: [{ label:'Daily spend ($)', data:data.map(d=>d.daily_cost),
-          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
-          fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:'#3b82f6' }],
-      },
-      options: { ...CD,
-        scales: {
-          x: { ticks:{color:'#64748b',maxTicksLimit:10}, grid:{color:'#1e293b'} },
-          y: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
-        },
-        plugins: { ...CD.plugins, legend:{display:false} },
-      },
-    });
+    charts.timeline = new Chart(document.getElementById('chart-timeline'), cfg);
   }
 }
 
-// --- Context bar chart + table ---
 async function refreshContexts() {
   const data = await fetch('/api/contexts').then(r => r.json());
-  const top = data.slice(0,10);
+  const top  = data.slice(0, 10);
+  const c    = chartColors();
 
-  if (charts.contexts) {
-    charts.contexts.data.labels = top.map(d => d.name);
-    charts.contexts.data.datasets[0].data = top.map(d => d.total_cost);
-    charts.contexts.update();
-  } else if (top.length) {
-    charts.contexts = new Chart(document.getElementById('chart-contexts'), {
-      type: 'bar',
-      data: { labels:top.map(d=>d.name), datasets:[{label:'Cost ($)',data:top.map(d=>d.total_cost),backgroundColor:CHART_COLORS[0],borderRadius:4}] },
-      options: { ...CD, indexAxis:'y',
-        scales: {
-          x: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
-          y: { ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} },
-        },
-        plugins: { ...CD.plugins, legend:{display:false} },
-      },
-    });
-  }
-
-  // Active context banner
   const active = data.find(r => r.is_active);
   const banner = document.getElementById('recording-banner');
   if (active) {
-    document.getElementById('recording-name').textContent = active.name;
+    document.getElementById('recording-name').textContent   = active.name;
     document.getElementById('recording-source').textContent = `(${active.source})`;
     banner.classList.remove('hidden');
   } else {
     banner.classList.add('hidden');
   }
 
+  const cfg = {
+    type: 'bar',
+    data: {
+      labels: top.map(d => d.name),
+      datasets: [{ label: 'Cost ($)', data: top.map(d => d.total_cost), backgroundColor: BLUES[0], borderRadius: 4, borderSkipped: false }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: c.tick, callback: v => `$${v.toFixed(3)}`, font: { size: 11 } }, grid: { color: c.grid }, beginAtZero: true },
+        y: { ticks: { color: c.tick, font: { size: 11 } }, grid: { color: 'transparent' } },
+      },
+    },
+  };
+  if (charts.ctxBar) {
+    charts.ctxBar.data.labels = cfg.data.labels;
+    charts.ctxBar.data.datasets[0].data = cfg.data.datasets[0].data;
+    charts.ctxBar.update();
+  } else if (top.length) {
+    charts.ctxBar = new Chart(document.getElementById('chart-contexts'), cfg);
+  }
+
   const tbody = document.getElementById('contexts-tbody');
   tbody.innerHTML = data.length
     ? data.map(r => `<tr class="${r.is_active ? 'active-row' : ''}">
-        <td><a href="/context/${r.id}">${r.name}</a>${r.is_active ? ' <span class="live-dot" style="margin-left:6px"></span>' : ''}</td>
-        <td><span class="source-badge source-${r.source}">${r.source}</span></td>
-        <td class="mono muted" style="text-align:right">${fmt.num(r.call_count)}</td>
-        <td class="mono muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
-        <td class="mono muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
+        <td>
+          <a href="/context/${r.id}">${r.name}</a>
+          ${r.is_active ? '<span class="live-dot" style="margin-left:7px;display:inline-block;vertical-align:middle"></span>' : ''}
+        </td>
+        <td><span class="badge-source badge-${r.source}">${r.source}</span></td>
+        <td class="mono text-muted" style="text-align:right">${fmt.num(r.call_count)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
+        <td class="mono text-muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
         <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
       </tr>`).join('')
-    : '<tr><td colspan="6" class="empty">No data yet. Start tokenledger serve and make some API calls.</td></tr>';
+    : '<tr><td colspan="6" class="empty">No data yet — start <code>tokenledger serve</code> and make some API calls.</td></tr>';
 }
 
-// --- Models donut ---
 async function refreshModels() {
   const data = await fetch('/api/models').then(r => r.json());
   if (!data.length) return;
+  const c = chartColors();
+  const cfg = {
+    type: 'doughnut',
+    data: {
+      labels: data.map(d => shortModel(d.model)),
+      datasets: [{
+        data: data.map(d => d.total_cost),
+        backgroundColor: BLUES,
+        borderColor: 'transparent',
+        borderWidth: 0,
+        hoverOffset: 4,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      cutout: '62%',
+      plugins: {
+        legend: { position: 'right', labels: { color: c.label, font: { size: 11 }, padding: 14, boxWidth: 10, boxHeight: 10 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt.cost(ctx.raw)}` } },
+      },
+    },
+  };
   if (charts.models) {
-    charts.models.data.labels = data.map(d => shortModel(d.model));
-    charts.models.data.datasets[0].data = data.map(d => d.total_cost);
+    charts.models.data.labels = cfg.data.labels;
+    charts.models.data.datasets[0].data = cfg.data.datasets[0].data;
     charts.models.update();
   } else {
-    charts.models = new Chart(document.getElementById('chart-models'), {
-      type: 'doughnut',
-      data: {
-        labels: data.map(d => shortModel(d.model)),
-        datasets: [{ data:data.map(d=>d.total_cost), backgroundColor:CHART_COLORS, borderColor:'#1e293b', borderWidth:2 }],
-      },
-      options: { ...CD,
-        plugins: {
-          legend: { position:'right', labels:{color:'#94a3b8',font:{size:11},padding:12} },
-          tooltip: { callbacks:{ label:ctx=>` ${ctx.label}: ${fmt.cost(ctx.raw)}` } },
-        },
-      },
-    });
+    charts.models = new Chart(document.getElementById('chart-models'), cfg);
   }
 }
 
 async function refresh() {
   await Promise.all([refreshSummary(), refreshTimeline(), refreshContexts(), refreshModels()]);
-  document.getElementById('last-updated').textContent =
-    `updated ${new Date().toLocaleTimeString()}`;
+  const t = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('last-updated').textContent = t;
 }
 
 refresh();
