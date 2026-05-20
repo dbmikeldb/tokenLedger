@@ -21,6 +21,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from tokenledger.analysis.model_scorer import score_call
 from tokenledger.config.cost_estimator import estimate_cost
 from tokenledger.context.tracker import ensure_context
 from tokenledger.proxy.observer import (
@@ -290,6 +291,22 @@ def _print_status(
         file=sys.stderr,
         flush=True,
     )
+
+    flag = score_call(
+        model=ctx.model,
+        input_tokens=input_tokens,
+        max_tokens=ctx.max_tokens,
+        tool_tokens=ctx.tool_tokens_hint,
+        messages=ctx.messages,
+        system=ctx.system,
+    )
+    if flag:
+        print(
+            f"[tokenledger] hint: {flag.current_display} -> {flag.recommended_display}"
+            f"  ({flag.reason}, save ~${flag.estimated_savings:.4f})",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 # ---------------------------------------------------------------------------
