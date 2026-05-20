@@ -14,13 +14,32 @@ from typing import Any
 class RequestContext:
     model: str
     max_tokens: int
+    messages: list[dict[str, Any]]
+    system: str | None
+    tool_tokens_hint: int       # rough estimate from tools list length
     request_id: str | None = None
 
 
 def build_request_context(body: dict[str, Any]) -> RequestContext:
+    messages = body.get("messages", [])
+    raw_system = body.get("system")
+    system: str | None = None
+    if isinstance(raw_system, str):
+        system = raw_system or None
+    elif isinstance(raw_system, list):
+        parts = [b.get("text","") for b in raw_system if isinstance(b, dict) and b.get("type")=="text"]
+        system = " ".join(parts).strip() or None
+
+    tools = body.get("tools", [])
+    # Rough estimate: each tool definition is ~200 tokens
+    tool_tokens_hint = len(tools) * 200
+
     return RequestContext(
         model=body.get("model", "unknown"),
         max_tokens=int(body.get("max_tokens", 1024)),
+        messages=messages,
+        system=system,
+        tool_tokens_hint=tool_tokens_hint,
     )
 
 
