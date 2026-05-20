@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tokenledger — context</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a; --surface: #1e293b; --border: #334155;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #3b82f6;
+      --green: #22c55e; --amber: #f59e0b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+    header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+    .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    main { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    .breadcrumb { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+    .breadcrumb a { color: var(--muted); }
+    .context-header { margin-bottom: 24px; }
+    .context-name { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+    .context-meta { color: var(--muted); font-size: 12px; display: flex; gap: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .card-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .card-value { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+    .chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+    .chart-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+    .chart-box canvas { max-height: 200px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    th { text-align: left; padding: 10px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 600; }
+    td { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+    .cost { color: var(--green); font-weight: 600; font-family: ui-monospace, monospace; }
+    .muted { color: var(--muted); }
+    .model-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; background: rgba(59,130,246,0.12); color: var(--accent); }
+    .source-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .source-git    { background: rgba(59,130,246,0.15); color: var(--accent); }
+    .source-manual { background: rgba(245,158,11,0.15); color: var(--amber); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="badge">TL</div>
+    <h1>tokenledger</h1>
+  </header>
+  <main>
+    <div class="breadcrumb"><a href="/">Dashboard</a> / <span id="ctx-name-crumb">context</span></div>
+
+    <div class="context-header">
+      <div class="context-name" id="ctx-name">—</div>
+      <div class="context-meta">
+        <span id="ctx-source"></span>
+        <span id="ctx-started"></span>
+        <span id="ctx-ended"></span>
+      </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Total cost</div>
+        <div class="card-value cost" id="stat-cost">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Calls</div>
+        <div class="card-value" id="stat-calls">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Input tokens</div>
+        <div class="card-value" id="stat-in">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Output tokens</div>
+        <div class="card-value" id="stat-out">—</div>
+      </div>
+    </div>
+
+    <!-- Cost over time for this context -->
+    <div class="chart-box">
+      <div class="chart-title">Spend over time — this context</div>
+      <canvas id="chart-timeline"></canvas>
+    </div>
+
+    <!-- Call log -->
+    <div class="section-title">Call log</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Time</th>
+          <th>Model</th>
+          <th style="text-align:right">Input tokens</th>
+          <th style="text-align:right">Output tokens</th>
+          <th style="text-align:right">Cost</th>
+        </tr>
+      </thead>
+      <tbody id="calls-tbody">
+        <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">Loading...</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+<script>
+const contextId = parseInt(location.pathname.split('/').pop());
+const fmt = {
+  cost:  v => `$${(v||0).toFixed(4)}`,
+  num:   v => (v||0).toLocaleString(),
+  short: v => { if(v>=1e6) return `${(v/1e6).toFixed(1)}M`; if(v>=1e3) return `${(v/1e3).toFixed(1)}K`; return String(v||0); },
+};
+
+const shortModel = m => m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : m.includes('haiku') ? 'haiku' : m;
+
+async function load() {
+  const d = await fetch(`/api/contexts/${contextId}`).then(r => r.json());
+  const { context: ctx, totals, calls } = d;
+
+  document.title = `tokenledger — ${ctx.name}`;
+  document.getElementById('ctx-name').textContent = ctx.name;
+  document.getElementById('ctx-name-crumb').textContent = ctx.name;
+  document.getElementById('ctx-source').innerHTML =
+    `<span class="source-badge source-${ctx.source}">${ctx.source}</span>`;
+  document.getElementById('ctx-started').textContent =
+    `started ${ctx.started_at.slice(0,16).replace('T',' ')}`;
+  document.getElementById('ctx-ended').textContent =
+    ctx.ended_at ? `ended ${ctx.ended_at.slice(0,16).replace('T',' ')}` : 'active';
+
+  document.getElementById('stat-cost').textContent  = fmt.cost(totals.total_cost);
+  document.getElementById('stat-calls').textContent = fmt.num(totals.call_count);
+  document.getElementById('stat-in').textContent    = fmt.short(totals.total_input_tokens);
+  document.getElementById('stat-out').textContent   = fmt.short(totals.total_output_tokens);
+
+  // Timeline chart — cumulative cost per call
+  if (calls.length) {
+    let running = 0;
+    new Chart(document.getElementById('chart-timeline'), {
+      type: 'line',
+      data: {
+        labels: calls.map((_, i) => `#${i+1}`),
+        datasets: [{
+          label: 'Cumulative cost',
+          data: calls.map(c => { running += (c.total_cost||0); return running; }),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.08)',
+          fill: true,
+          tension: 0.2,
+          pointRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#64748b', maxTicksLimit: 12 }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
+        },
+      },
+    });
+  }
+
+  // Call table
+  const tbody = document.getElementById('calls-tbody');
+  if (!calls.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">No calls recorded.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = calls.map((c, i) => `
+    <tr>
+      <td class="muted mono">${i+1}</td>
+      <td class="muted mono">${c.timestamp.slice(0,19).replace('T',' ')}</td>
+      <td><span class="model-tag">${shortModel(c.model)}</span></td>
+      <td class="mono muted" style="text-align:right">${fmt.num(c.input_tokens||0)}</td>
+      <td class="mono muted" style="text-align:right">${fmt.num(c.output_tokens||0)}</td>
+      <td class="cost" style="text-align:right">${fmt.cost(c.total_cost)}</td>
+    </tr>`).join('');
+}
+
+load();
+</script>
+</body>
+</html>
