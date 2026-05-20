@@ -25,7 +25,11 @@
     header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
     header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
     header span { color: var(--muted); font-size: 12px; }
+    header .spacer { flex: 1; }
     .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .last-updated { color: var(--muted); font-size: 11px; }
 
     main { padding: 24px; max-width: 1280px; margin: 0 auto; }
 
@@ -66,7 +70,9 @@
   <header>
     <div class="badge">TL</div>
     <h1>tokenledger</h1>
-    <span id="db-path"></span>
+    <div class="spacer"></div>
+    <span class="live-dot"></span>
+    <span class="last-updated" id="last-updated">loading…</span>
   </header>
 
   <main>
@@ -133,134 +139,123 @@
 const fmt = {
   cost:  v => `$${(v||0).toFixed(4)}`,
   num:   v => (v||0).toLocaleString(),
-  short: v => {
-    if (v >= 1e6) return `${(v/1e6).toFixed(1)}M`;
-    if (v >= 1e3) return `${(v/1e3).toFixed(1)}K`;
-    return String(v||0);
-  },
+  short: v => { if(v>=1e6) return `${(v/1e6).toFixed(1)}M`; if(v>=1e3) return `${(v/1e3).toFixed(1)}K`; return String(v||0); },
 };
-
 const CHART_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4','#ec4899'];
+const shortModel = m => m.includes('opus')?'opus':m.includes('sonnet')?'sonnet':m.includes('haiku')?'haiku':m;
+const CD = { responsive:true, maintainAspectRatio:true, plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}} };
 
-const chartDefaults = {
-  responsive: true,
-  maintainAspectRatio: true,
-  plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
-};
+let charts = {};
 
-async function loadSummary() {
+// --- Stat cards (DOM only, no chart) ---
+async function refreshSummary() {
   const d = await fetch('/api/summary').then(r => r.json());
   document.getElementById('stat-alltime').textContent = fmt.cost(d.all_time);
   document.getElementById('stat-week').textContent    = fmt.cost(d.this_week);
   document.getElementById('stat-month').textContent   = fmt.cost(d.this_month);
   document.getElementById('stat-calls').textContent   = `${fmt.num(d.call_count)} calls`;
-  const total = (d.total_input_tokens||0) + (d.total_output_tokens||0);
+  const total = (d.total_input_tokens||0)+(d.total_output_tokens||0);
   document.getElementById('stat-tokens').textContent     = fmt.short(total);
-  document.getElementById('stat-tokens-sub').textContent =
-    `${fmt.short(d.total_input_tokens)} in / ${fmt.short(d.total_output_tokens)} out`;
+  document.getElementById('stat-tokens-sub').textContent = `${fmt.short(d.total_input_tokens)} in / ${fmt.short(d.total_output_tokens)} out`;
 }
 
-async function loadTimeline() {
+// --- Timeline (create once, update data on refresh) ---
+async function refreshTimeline() {
   const data = await fetch('/api/timeline?days=30').then(r => r.json());
   if (!data.length) return;
-  new Chart(document.getElementById('chart-timeline'), {
-    type: 'line',
-    data: {
-      labels: data.map(d => d.day),
-      datasets: [{
-        label: 'Daily spend ($)',
-        data: data.map(d => d.daily_cost),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.08)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 3,
-        pointBackgroundColor: '#3b82f6',
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        x: { ticks: { color: '#64748b', maxTicksLimit: 10 }, grid: { color: '#1e293b' } },
-        y: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
+  if (charts.timeline) {
+    charts.timeline.data.labels = data.map(d => d.day);
+    charts.timeline.data.datasets[0].data = data.map(d => d.daily_cost);
+    charts.timeline.update();
+  } else {
+    charts.timeline = new Chart(document.getElementById('chart-timeline'), {
+      type: 'line',
+      data: {
+        labels: data.map(d => d.day),
+        datasets: [{ label:'Daily spend ($)', data:data.map(d=>d.daily_cost),
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
+          fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:'#3b82f6' }],
       },
-      plugins: { ...chartDefaults.plugins, legend: { display: false } },
-    },
-  });
-}
-
-async function loadContextChart() {
-  const data = await fetch('/api/contexts').then(r => r.json());
-  if (!data.length) return;
-  const top = data.slice(0, 10);
-  new Chart(document.getElementById('chart-contexts'), {
-    type: 'bar',
-    data: {
-      labels: top.map(d => d.name),
-      datasets: [{
-        label: 'Cost ($)',
-        data: top.map(d => d.total_cost),
-        backgroundColor: CHART_COLORS[0],
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      indexAxis: 'y',
-      scales: {
-        x: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
-        y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } },
+      options: { ...CD,
+        scales: {
+          x: { ticks:{color:'#64748b',maxTicksLimit:10}, grid:{color:'#1e293b'} },
+          y: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
+        },
+        plugins: { ...CD.plugins, legend:{display:false} },
       },
-      plugins: { ...chartDefaults.plugins, legend: { display: false } },
-    },
-  });
-
-  // Also populate table
-  const tbody = document.getElementById('contexts-tbody');
-  if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty">No data yet. Start tokenledger serve and make some API calls.</td></tr>';
-    return;
+    });
   }
-  tbody.innerHTML = data.map(r => `
-    <tr>
-      <td><a href="/context/${r.id}">${r.name}</a></td>
-      <td><span class="source-badge source-${r.source}">${r.source}</span></td>
-      <td class="mono muted" style="text-align:right">${fmt.num(r.call_count)}</td>
-      <td class="mono muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
-      <td class="mono muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
-      <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
-    </tr>`).join('');
 }
 
-async function loadModels() {
+// --- Context bar chart + table ---
+async function refreshContexts() {
+  const data = await fetch('/api/contexts').then(r => r.json());
+  const top = data.slice(0,10);
+
+  if (charts.contexts) {
+    charts.contexts.data.labels = top.map(d => d.name);
+    charts.contexts.data.datasets[0].data = top.map(d => d.total_cost);
+    charts.contexts.update();
+  } else if (top.length) {
+    charts.contexts = new Chart(document.getElementById('chart-contexts'), {
+      type: 'bar',
+      data: { labels:top.map(d=>d.name), datasets:[{label:'Cost ($)',data:top.map(d=>d.total_cost),backgroundColor:CHART_COLORS[0],borderRadius:4}] },
+      options: { ...CD, indexAxis:'y',
+        scales: {
+          x: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
+          y: { ticks:{color:'#94a3b8'}, grid:{color:'#1e293b'} },
+        },
+        plugins: { ...CD.plugins, legend:{display:false} },
+      },
+    });
+  }
+
+  const tbody = document.getElementById('contexts-tbody');
+  tbody.innerHTML = data.length
+    ? data.map(r => `<tr>
+        <td><a href="/context/${r.id}">${r.name}</a></td>
+        <td><span class="source-badge source-${r.source}">${r.source}</span></td>
+        <td class="mono muted" style="text-align:right">${fmt.num(r.call_count)}</td>
+        <td class="mono muted" style="text-align:right">${fmt.short(r.total_input_tokens)}</td>
+        <td class="mono muted" style="text-align:right">${fmt.short(r.total_output_tokens)}</td>
+        <td class="cost" style="text-align:right">${fmt.cost(r.total_cost)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="empty">No data yet. Start tokenledger serve and make some API calls.</td></tr>';
+}
+
+// --- Models donut ---
+async function refreshModels() {
   const data = await fetch('/api/models').then(r => r.json());
   if (!data.length) return;
-  const shortName = m => m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : m.includes('haiku') ? 'haiku' : m;
-  new Chart(document.getElementById('chart-models'), {
-    type: 'doughnut',
-    data: {
-      labels: data.map(d => shortName(d.model)),
-      datasets: [{
-        data: data.map(d => d.total_cost),
-        backgroundColor: CHART_COLORS,
-        borderColor: '#1e293b',
-        borderWidth: 2,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      plugins: {
-        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${fmt.cost(ctx.raw)} (${ctx.formattedValue})` } },
+  if (charts.models) {
+    charts.models.data.labels = data.map(d => shortModel(d.model));
+    charts.models.data.datasets[0].data = data.map(d => d.total_cost);
+    charts.models.update();
+  } else {
+    charts.models = new Chart(document.getElementById('chart-models'), {
+      type: 'doughnut',
+      data: {
+        labels: data.map(d => shortModel(d.model)),
+        datasets: [{ data:data.map(d=>d.total_cost), backgroundColor:CHART_COLORS, borderColor:'#1e293b', borderWidth:2 }],
       },
-    },
-  });
+      options: { ...CD,
+        plugins: {
+          legend: { position:'right', labels:{color:'#94a3b8',font:{size:11},padding:12} },
+          tooltip: { callbacks:{ label:ctx=>` ${ctx.label}: ${fmt.cost(ctx.raw)}` } },
+        },
+      },
+    });
+  }
 }
 
-loadSummary();
-loadTimeline();
-loadContextChart();
-loadModels();
+async function refresh() {
+  await Promise.all([refreshSummary(), refreshTimeline(), refreshContexts(), refreshModels()]);
+  document.getElementById('last-updated').textContent =
+    `updated ${new Date().toLocaleTimeString()}`;
+}
+
+refresh();
+setInterval(refresh, 30_000);
 </script>
 </body>
 </html>

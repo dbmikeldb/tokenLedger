@@ -15,7 +15,11 @@
     body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
     header { padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
     header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+    header .spacer { flex: 1; }
     .badge { background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.05em; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .last-updated { color: var(--muted); font-size: 11px; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     main { padding: 24px; max-width: 1280px; margin: 0 auto; }
@@ -50,6 +54,9 @@
   <header>
     <div class="badge">TL</div>
     <h1>tokenledger</h1>
+    <div class="spacer"></div>
+    <span class="live-dot"></span>
+    <span class="last-updated" id="last-updated">loading…</span>
   </header>
   <main>
     <div class="breadcrumb"><a href="/">Dashboard</a> / <span id="ctx-name-crumb">context</span></div>
@@ -115,75 +122,81 @@ const fmt = {
   num:   v => (v||0).toLocaleString(),
   short: v => { if(v>=1e6) return `${(v/1e6).toFixed(1)}M`; if(v>=1e3) return `${(v/1e3).toFixed(1)}K`; return String(v||0); },
 };
+const shortModel = m => m.includes('opus')?'opus':m.includes('sonnet')?'sonnet':m.includes('haiku')?'haiku':m;
 
-const shortModel = m => m.includes('opus') ? 'opus' : m.includes('sonnet') ? 'sonnet' : m.includes('haiku') ? 'haiku' : m;
+let timelineChart = null;
+let headerLoaded = false;
 
-async function load() {
+async function refresh() {
   const d = await fetch(`/api/contexts/${contextId}`).then(r => r.json());
   const { context: ctx, totals, calls } = d;
 
-  document.title = `tokenledger — ${ctx.name}`;
-  document.getElementById('ctx-name').textContent = ctx.name;
-  document.getElementById('ctx-name-crumb').textContent = ctx.name;
-  document.getElementById('ctx-source').innerHTML =
-    `<span class="source-badge source-${ctx.source}">${ctx.source}</span>`;
-  document.getElementById('ctx-started').textContent =
-    `started ${ctx.started_at.slice(0,16).replace('T',' ')}`;
+  // Header — only set once
+  if (!headerLoaded) {
+    document.title = `tokenledger — ${ctx.name}`;
+    document.getElementById('ctx-name').textContent = ctx.name;
+    document.getElementById('ctx-name-crumb').textContent = ctx.name;
+    document.getElementById('ctx-source').innerHTML =
+      `<span class="source-badge source-${ctx.source}">${ctx.source}</span>`;
+    document.getElementById('ctx-started').textContent =
+      `started ${ctx.started_at.slice(0,16).replace('T',' ')}`;
+    headerLoaded = true;
+  }
   document.getElementById('ctx-ended').textContent =
     ctx.ended_at ? `ended ${ctx.ended_at.slice(0,16).replace('T',' ')}` : 'active';
 
+  // Stat cards
   document.getElementById('stat-cost').textContent  = fmt.cost(totals.total_cost);
   document.getElementById('stat-calls').textContent = fmt.num(totals.call_count);
   document.getElementById('stat-in').textContent    = fmt.short(totals.total_input_tokens);
   document.getElementById('stat-out').textContent   = fmt.short(totals.total_output_tokens);
 
-  // Timeline chart — cumulative cost per call
+  // Cumulative cost chart
   if (calls.length) {
     let running = 0;
-    new Chart(document.getElementById('chart-timeline'), {
-      type: 'line',
-      data: {
-        labels: calls.map((_, i) => `#${i+1}`),
-        datasets: [{
-          label: 'Cumulative cost',
-          data: calls.map(c => { running += (c.total_cost||0); return running; }),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.08)',
-          fill: true,
-          tension: 0.2,
-          pointRadius: 2,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { ticks: { color: '#64748b', maxTicksLimit: 12 }, grid: { color: '#1e293b' } },
-          y: { ticks: { color: '#64748b', callback: v => `$${v.toFixed(3)}` }, grid: { color: '#334155' }, beginAtZero: true },
+    const labels = calls.map((_, i) => `#${i+1}`);
+    const data   = calls.map(c => { running += (c.total_cost||0); return running; });
+    if (timelineChart) {
+      timelineChart.data.labels = labels;
+      timelineChart.data.datasets[0].data = data;
+      timelineChart.update();
+    } else {
+      timelineChart = new Chart(document.getElementById('chart-timeline'), {
+        type: 'line',
+        data: { labels, datasets:[{ label:'Cumulative cost', data,
+          borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.08)',
+          fill:true, tension:0.2, pointRadius:2 }] },
+        options: {
+          responsive:true, maintainAspectRatio:true,
+          plugins:{ legend:{display:false} },
+          scales: {
+            x: { ticks:{color:'#64748b',maxTicksLimit:12}, grid:{color:'#1e293b'} },
+            y: { ticks:{color:'#64748b',callback:v=>`$${v.toFixed(3)}`}, grid:{color:'#334155'}, beginAtZero:true },
+          },
         },
-      },
-    });
+      });
+    }
   }
 
   // Call table
   const tbody = document.getElementById('calls-tbody');
-  if (!calls.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">No calls recorded.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = calls.map((c, i) => `
-    <tr>
-      <td class="muted mono">${i+1}</td>
-      <td class="muted mono">${c.timestamp.slice(0,19).replace('T',' ')}</td>
-      <td><span class="model-tag">${shortModel(c.model)}</span></td>
-      <td class="mono muted" style="text-align:right">${fmt.num(c.input_tokens||0)}</td>
-      <td class="mono muted" style="text-align:right">${fmt.num(c.output_tokens||0)}</td>
-      <td class="cost" style="text-align:right">${fmt.cost(c.total_cost)}</td>
-    </tr>`).join('');
+  tbody.innerHTML = calls.length
+    ? calls.map((c,i) => `<tr>
+        <td class="muted mono">${i+1}</td>
+        <td class="muted mono">${c.timestamp.slice(0,19).replace('T',' ')}</td>
+        <td><span class="model-tag">${shortModel(c.model)}</span></td>
+        <td class="mono muted" style="text-align:right">${fmt.num(c.input_tokens||0)}</td>
+        <td class="mono muted" style="text-align:right">${fmt.num(c.output_tokens||0)}</td>
+        <td class="cost" style="text-align:right">${fmt.cost(c.total_cost)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:32px">No calls recorded.</td></tr>';
+
+  document.getElementById('last-updated').textContent =
+    `updated ${new Date().toLocaleTimeString()}`;
 }
 
-load();
+refresh();
+setInterval(refresh, 30_000);
 </script>
 </body>
 </html>
