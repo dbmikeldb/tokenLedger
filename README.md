@@ -160,12 +160,6 @@ pytest tests/ --cov=tokenledger
 
 ---
 
-## Companion tool
-
-**[tokenGate](https://github.com/dbmikeldb/tokenGate)** — interactive terminal gate that intercepts individual API calls before they're sent, shows token counts and cost estimates, and waits for you to pass, edit, or abort. Use tokenGate when you want to review calls; use tokenledger when you want to track spend passively.
-
----
-
 ## License
 
 MIT
