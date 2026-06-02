@@ -55,28 +55,19 @@ def _git_repo_at(cwd: str) -> str:
 
 
 def _most_active_git_branch() -> str | None:
-    """Scan ~/*/HEAD (depth 3) and return the branch from the most recently
-    modified HEAD file. HEAD is updated on every commit and branch switch,
-    so the newest mtime reliably indicates the actively worked-on repo."""
+    """Scan repos under home and return the branch from the repo whose
+    .git/index was modified most recently. The index updates on git
+    operations and staging, making it a reliable signal for the actively
+    worked-on repo rather than just the last branch switch."""
     home = Path.home()
     best: tuple[float, str] | None = None
-    for head_file in home.glob("*/.git/HEAD"):
+    candidates = list(home.glob("*/.git/index")) + list(home.glob("*/*/.git/index"))
+    for index_file in candidates:
         try:
-            mtime = head_file.stat().st_mtime
+            mtime = index_file.stat().st_mtime
             if best and mtime <= best[0]:
                 continue
-            branch = _git_branch_at(str(head_file.parent.parent))
-            if branch:
-                best = (mtime, branch)
-        except OSError:
-            pass
-    # Also check one level deeper (e.g. ~/work/project/.git/HEAD)
-    for head_file in home.glob("*/*/.git/HEAD"):
-        try:
-            mtime = head_file.stat().st_mtime
-            if best and mtime <= best[0]:
-                continue
-            branch = _git_branch_at(str(head_file.parent.parent))
+            branch = _git_branch_at(str(index_file.parent.parent))
             if branch:
                 best = (mtime, branch)
         except OSError:
@@ -103,15 +94,16 @@ def resolve_context(
 
 
 def _repo_from_most_active(cwd: str | None) -> str:
-    """Return the repo name from the most recently active git repo."""
+    """Return the repo name from the repo whose .git/index was modified most recently."""
     home = Path.home()
     best: tuple[float, str] | None = None
-    for head_file in list(home.glob("*/.git/HEAD")) + list(home.glob("*/*/.git/HEAD")):
+    candidates = list(home.glob("*/.git/index")) + list(home.glob("*/*/.git/index"))
+    for index_file in candidates:
         try:
-            mtime = head_file.stat().st_mtime
+            mtime = index_file.stat().st_mtime
             if best and mtime <= best[0]:
                 continue
-            repo = _git_repo_at(str(head_file.parent.parent))
+            repo = _git_repo_at(str(index_file.parent.parent))
             if repo:
                 best = (mtime, repo)
         except OSError:
