@@ -36,35 +36,44 @@ Requires Python 3.11+.
 
 ## Quick start
 
-**Terminal 1 — start the proxy:**
+**One-time setup:**
 ```bash
-tokenledger serve
-# tokenledger proxy listening on http://127.0.0.1:8080
+tokenledger install
+source ~/.bashrc
 ```
 
-**Terminal 2 — point Claude Code at it:**
+This adds `tokenledger` to your PATH and creates a `claude` alias. From now on, just run:
+
 ```bash
-# One-time setup in ~/.claude/settings.json:
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "http://127.0.0.1:8080"
-  }
-}
+claude
 ```
 
-**Terminal 3 — open the dashboard:**
+tokenledger automatically starts the proxy, opens the web dashboard, detects your active git branch, and launches Claude Code — all in one command.
+
+---
+
+## What `claude` does
+
+1. Starts the proxy on `http://127.0.0.1:8080` (if not already running)
+2. Starts the web UI at `http://127.0.0.1:8787` (if not already running)
+3. Detects your current git repo and branch
+4. Sets `ANTHROPIC_BASE_URL` so Claude Code routes through the proxy
+5. Execs into the real `claude` binary — no wrapper process left behind
+
 ```bash
-tokenledger ui
-# Opens http://127.0.0.1:8787 in your browser
+claude                    # normal usage
+claude --no-ui            # skip starting the web UI
+claude --summary          # print session cost on exit
 ```
 
-Now use Claude Code normally. Every API call is recorded and attributed to your current git branch.
+> **Remote machines / SSH:** The UI binds to `127.0.0.1`. Forward the port with  
+> `ssh -L 8787:127.0.0.1:8787 your-server` then browse to `http://localhost:8787`.
 
 ---
 
 ## Context attribution
 
-tokenledger automatically detects your active git branch by scanning `~/*/` for the most recently switched repo. Switch branches and the next call is attributed to the new branch — no restart needed.
+tokenledger detects the active git branch by scanning repos under `~/` for the one whose `.git/index` was modified most recently — a reliable signal for which repo is actively being worked on.
 
 ```bash
 # See what context is currently recording
@@ -77,18 +86,18 @@ tokenledger context "sprint-42-bugfix"
 tokenledger context --clear
 ```
 
-You can also set the context when starting the proxy:
-```bash
-tokenledger serve --context "client-project"
-```
+Context switches take effect on the next API call — no restart needed.
 
-### Switching context while the proxy is running
+---
 
-`tokenledger context` talks to the live proxy via HTTP — no restart needed:
+## Status and control
 
 ```bash
-tokenledger context "feat/payments"
-# Context set: 'feat/payments' (proxy notified live)
+# Show proxy, UI, active context, and today's spend
+tokenledger status
+
+# Stop the proxy and web UI
+tokenledger stop
 ```
 
 ---
@@ -106,24 +115,29 @@ tokenledger ui --port 9000
 - Daily spend line chart (last 30 days)
 - Cost per context bar chart
 - Model breakdown donut (haiku / sonnet / opus)
+- Repos tab — spend broken down by repository
 - Context table with links to per-context drill-down
-
-**Context detail shows:**
-- Cumulative cost chart across all calls
-- Call-by-call log with model, tokens, and cost
 
 Both pages auto-refresh every 30 seconds.
 
 ---
 
-## CLI report
+## CLI reference
 
 ```bash
-# Summary table — cost per context
-tokenledger report
-
-# Per-call detail for context id=3
-tokenledger report 3
+claude                            # start everything and launch Claude Code
+tokenledger status                # health check: proxy, UI, context, spend
+tokenledger stop                  # stop proxy and web UI
+tokenledger context               # show active context
+tokenledger context "label"       # set manual context
+tokenledger context --clear       # return to git auto-detection
+tokenledger report                # cost table by context
+tokenledger report 3              # per-call detail for context id=3
+tokenledger export                # export all calls to CSV (stdout)
+tokenledger export --format json  # export as JSON
+tokenledger install               # add PATH and alias to shell rc file
+tokenledger serve                 # start proxy only
+tokenledger ui                    # start web UI only
 ```
 
 ---
