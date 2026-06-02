@@ -99,6 +99,18 @@ async def control_clear_context() -> JSONResponse:
     return JSONResponse({"context": None, "source": "git"})
 
 
+@app.post("/control/workspace")
+async def control_set_workspace(request: Request) -> JSONResponse:
+    global _workspace_cwd
+    body = await request.json()
+    cwd = body.get("cwd", "").strip()
+    if not cwd:
+        return JSONResponse({"error": "cwd required"}, status_code=400)
+    _workspace_cwd = cwd
+    ensure_context(manual_label=_manual_override, cwd=_workspace_cwd, db_path=_db_path)
+    return JSONResponse({"workspace_cwd": _workspace_cwd})
+
+
 @app.get("/control/context")
 async def control_get_context() -> JSONResponse:
     from tokenledger.storage.db import get_open_context
