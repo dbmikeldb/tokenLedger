@@ -25,9 +25,9 @@ Nothing is sent anywhere other than Anthropic. Your data stays on your machine.
 ## Install
 
 ```bash
-git clone https://github.com/dbmikeldb/tokenledger
-cd tokenledger
-pip install -e ".[dev]"
+git clone https://github.com/dbmikeldb/tokenLedger
+cd tokenLedger
+pip install -e ".[proxy]"
 ```
 
 Requires Python 3.11+.
