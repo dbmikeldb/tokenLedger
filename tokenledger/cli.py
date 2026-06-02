@@ -443,7 +443,7 @@ def cmd_report(args: argparse.Namespace) -> None:
         console.print("[dim]No recorded sessions yet.[/dim]")
         return
 
-    table = Table(title="tokenledger — cost by context", show_lines=True)
+    table = Table(title="tokenLedger — cost by context", show_lines=True)
     table.add_column("ID", style="dim", width=4)
     table.add_column("Context", style="bold")
     table.add_column("Source", style="dim")
@@ -626,7 +626,7 @@ def cmd_stop(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="tokenledger",
-        description="tokenledger — AI cost ledger for your work",
+        description="tokenLedger — AI cost ledger for your work",
     )
     sub = parser.add_subparsers(dest="command")
 

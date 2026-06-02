@@ -71,7 +71,7 @@ async def _lifespan(app: FastAPI):
         _proxy_info_path().unlink(missing_ok=True)
 
 
-app = FastAPI(title="tokenledger proxy", docs_url=None, redoc_url=None, lifespan=_lifespan)
+app = FastAPI(title="tokenLedger proxy", docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +362,6 @@ def run_server(host: str = "127.0.0.1", port: int = 8080) -> None:
     info_path = _proxy_info_path()
     info_path.parent.mkdir(parents=True, exist_ok=True)
     info_path.write_text(json.dumps({"host": host, "port": port, "pid": os.getpid()}))
-    print(f"tokenledger proxy listening on http://{host}:{port}", file=sys.stderr)
+    print(f"tokenLedger proxy listening on http://{host}:{port}", file=sys.stderr)
     print(f"export ANTHROPIC_BASE_URL=http://{host}:{port}", file=sys.stderr, flush=True)
     uvicorn.run(app, host=host, port=port, log_level="warning")

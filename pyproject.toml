@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tokenledger"
 version = "0.1.0"
-description = "AI cost ledger — attribute LLM API spend to PRs, branches, and work contexts"
+description = "tokenLedger — attribute LLM API spend to PRs, branches, and work contexts"
 requires-python = ">=3.11"
 dependencies = [
     "rich>=13.7.0",

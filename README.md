@@ -1,4 +1,4 @@
-# tokenledger
+# tokenLedger
 
 **AI cost ledger.** Sits as a transparent HTTP proxy between your tools (Claude Code, scripts, IDEs) and the Anthropic API — silently recording every LLM call, attributing spend to the git branch or work context you're on, and making it visible through a web dashboard.
 

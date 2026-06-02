@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>tokenledger</title>
+  <title>tokenLedger</title>
   <script>
     (function() {
       const t = localStorage.getItem('tl-theme') || 'dark';
@@ -249,7 +249,7 @@ async function refresh() {
   const { context: ctx, totals, calls } = d;
 
   if (!headerLoaded) {
-    document.title = `tokenledger — ${ctx.name}`;
+    document.title = `tokenLedger — ${ctx.name}`;
     document.getElementById('ctx-name').textContent       = ctx.name;
     document.getElementById('ctx-name-crumb').textContent = ctx.name;
     document.getElementById('ctx-source').innerHTML =
